@@ -30,3 +30,131 @@ pip install rich
 When you run your code, you'll see something like this:
 
 ![Example logging output using `rich`](media/rich.png)
+
+## 🆕 External Tool Calling Support
+
+RLM now supports **external tool calling** (OpenAI-compatible)! This means you can use RLM as a virtual LLM API that:
+- ✅ Handles massive contexts internally via REPL/recursion
+- ✅ Exposes external tool calls to the caller
+- ✅ Seamlessly continues when tool results are provided
+- ✅ Maintains full backward compatibility
+
+### Quick Start with Tool Calling
+
+```python
+from rlm.rlm_api import create_rlm_client
+
+# Initialize RLM with tool calling support
+api = create_rlm_client(
+    model="gpt-5-nano",
+    recursive_model="gpt-5",
+    enable_logging=True
+)
+
+# Define tools (OpenAI format)
+tools = [{
+    "type": "function",
+    "function": {
+        "name": "search_database",
+        "description": "Search a database for information",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query"}
+            },
+            "required": ["query"]
+        }
+    }
+}]
+
+# Make request with massive context + tools
+response = api.chat_completion(
+    messages=[
+        {"role": "system", "content": "...1M lines of context..."},
+        {"role": "user", "content": "Find X in the context"}
+    ],
+    tools=tools
+)
+
+# Handle tool calls if returned
+if response['choices'][0]['finish_reason'] == 'tool_calls':
+    # Execute tools externally
+    tool_results = execute_tools(response['choices'][0]['message']['tool_calls'])
+    
+    # Continue with results
+    response = api.chat_completion(
+        messages=[...previous_messages..., tool_results],
+        tools=tools
+    )
+
+print(response['choices'][0]['message']['content'])
+```
+
+### Example & Documentation
+
+- **Example**: `example_tool_calling.py` - Complete working examples
+- **Documentation**: `llm-adapter.md` - Full implementation details
+- **Run example**: `python example_tool_calling.py`
+
+### Key Features
+
+1. **OpenAI-Compatible**: Drop-in replacement for OpenAI API
+2. **Stateful Sessions**: Automatically handles tool call continuations
+3. **Priority Handling**: External tools > Internal REPL > Final answer
+4. **Backward Compatible**: Works with or without tools parameter
+
+## 🌐 HTTP API Server
+
+Run RLM as an **OpenAI-compatible HTTP server** on localhost!
+
+### Quick Start
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Start server
+python rlm_server.py
+
+# 3. Use with any OpenAI client!
+```
+
+### Usage
+
+```python
+from openai import OpenAI
+
+# Point to RLM server instead of OpenAI
+client = OpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="dummy"
+)
+
+# Use exactly like OpenAI!
+response = client.chat.completions.create(
+    model="gpt-4o-mini:gpt-4o",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+```
+
+Or set environment variables:
+```bash
+export OPENAI_BASE_URL="http://localhost:8000/v1"
+export OPENAI_API_KEY="dummy"
+
+# Now ANY tool using OpenAI will use RLM!
+```
+
+### Server Features
+
+- ✅ **Full OpenAI API compatibility** - Works with OpenAI Python client
+- ✅ **Tool calling support** - Function calling works perfectly
+- ✅ **Massive contexts** - Handles 1M+ tokens internally
+- ✅ **Multiple models** - Switch between different model combinations
+- ✅ **Easy integration** - Works with LangChain, LlamaIndex, etc.
+
+### Documentation
+
+- **Server Guide**: `SERVER_GUIDE.md` - Complete server documentation
+- **Client Examples**: `example_client.py` - Working code examples
+- **Run examples**: See `SERVER_GUIDE.md` for all use cases

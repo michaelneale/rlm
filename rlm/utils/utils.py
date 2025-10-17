@@ -5,6 +5,51 @@ Utility functions for the RLM REPL Client.
 import re
 from typing import List, Dict, Optional, Tuple, Any
 
+def extract_response_content(response):
+    """
+    Extract content from response (handles both dict and string responses).
+    
+    Args:
+        response: Either a string or dict response from LLM
+        
+    Returns:
+        String content
+    """
+    if isinstance(response, dict):
+        return response.get('content', '') or ''
+    return response
+
+def has_tool_calls(response):
+    """
+    Check if response contains tool calls.
+    
+    Args:
+        response: Either a string or dict response from LLM
+        
+    Returns:
+        bool: True if response has tool calls
+    """
+    if isinstance(response, dict):
+        tool_calls = response.get('tool_calls')
+        return tool_calls is not None and tool_calls
+    return False
+
+def format_tool_call_message(response):
+    """
+    Format response with tool calls for message history.
+    
+    Args:
+        response: Dict response with tool_calls
+        
+    Returns:
+        Message dict for conversation history
+    """
+    return {
+        'role': 'assistant',
+        'content': response.get('content'),
+        'tool_calls': response.get('tool_calls')
+    }
+
 def find_code_blocks(text: str) -> List[str]:
     """
     Find REPL code blocks in text wrapped in triple backticks and return List of content(s).

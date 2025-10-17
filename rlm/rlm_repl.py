@@ -73,37 +73,87 @@ class RLM_REPL(RLM):
         
         return self.messages
 
-    def completion(self, context: List[str] | str | List[Dict[str, str]], query: Optional[str] = None) -> str:
+    def completion(
+        self, 
+        context: List[str] | str | List[Dict[str, str]], 
+        query: Optional[str] = None,
+        tools: Optional[List[Dict]] = None,
+        tool_results: Optional[List[Dict]] = None
+    ) -> str | Dict:
         """
         Given a query and a (potentially long) context, recursively call the LM
         to explore the context and provide an answer using a REPL environment.
+        
+        Now supports external tool calling:
+        - If tools provided, LLM can return tool calls to caller
+        - If tool_results provided, continues execution after tool calls
+        
+        Args:
+            context: The context to analyze
+            query: The user's query
+            tools: Optional list of external tool definitions
+            tool_results: Optional tool results to continue execution
+            
+        Returns:
+            If tool calls detected: Dict with 'type': 'tool_calls'
+            Otherwise: String with final answer (backward compatible)
         """
-        self.messages = self.setup_context(context, query)
+        # Setup or restore state
+        if tool_results is None:
+            # New execution - setup context
+            self.messages = self.setup_context(context, query)
+        else:
+            # Continuing from tool calls - append tool results to messages
+            self.messages.extend(tool_results)
         
         # Main loop runs for fixed # of root LM iterations
         for iteration in range(self._max_iterations):
             
-            # Query root LM to interact with REPL environment
-            response = self.llm.completion(self.messages + [next_action_prompt(query, iteration)])
+            # Query root LM to interact with REPL environment (with optional tools)
+            response = self.llm.completion(
+                self.messages + [next_action_prompt(query, iteration)],
+                tools=tools
+            )
             
-            # Check for code blocks
-            code_blocks = utils.find_code_blocks(response)
-            self.logger.log_model_response(response, has_tool_calls=code_blocks is not None)
+            # PRIORITY 1: Check for external tool calls first
+            if utils.has_tool_calls(response):
+                # Log tool call response
+                self.logger.log_model_response(
+                    utils.extract_response_content(response), 
+                    has_tool_calls=True
+                )
+                
+                # Add assistant message with tool calls to history
+                self.messages.append(utils.format_tool_call_message(response))
+                
+                # Return control to caller with tool calls
+                return {
+                    'type': 'tool_calls',
+                    'tool_calls': response['tool_calls'],
+                    'content': response.get('content'),
+                    'state': 'paused',
+                    'iteration': iteration
+                }
+            
+            # PRIORITY 2: Check for internal REPL code blocks
+            response_text = utils.extract_response_content(response)
+            code_blocks = utils.find_code_blocks(response_text)
+            self.logger.log_model_response(response_text, has_tool_calls=code_blocks is not None)
             
             # Process code execution or add assistant message
             if code_blocks is not None:
                 self.messages = utils.process_code_execution(
-                    response, self.messages, self.repl_env, 
+                    response_text, self.messages, self.repl_env, 
                     self.repl_env_logger, self.logger
                 )
             else:
                 # Add assistant message when there are no code blocks
-                assistant_message = {"role": "assistant", "content": "You responded with:\n" + response}
+                assistant_message = {"role": "assistant", "content": "You responded with:\n" + response_text}
                 self.messages.append(assistant_message)
             
-            # Check that model produced a final answer
+            # PRIORITY 3: Check that model produced a final answer
             final_answer = utils.check_for_final_answer(
-                response, self.repl_env, self.logger,
+                response_text, self.repl_env, self.logger,
             )
 
             # In practice, you may need some guardrails here.
@@ -115,7 +165,8 @@ class RLM_REPL(RLM):
         # If we reach here, no final answer was found in any iteration
         print("No final answer found in any iteration")
         self.messages.append(next_action_prompt(query, iteration, final_answer=True))
-        final_answer = self.llm.completion(self.messages)
+        final_response = self.llm.completion(self.messages, tools=None)  # No tools on final call
+        final_answer = utils.extract_response_content(final_response)
         self.logger.log_final_response(final_answer)
 
         return final_answer
