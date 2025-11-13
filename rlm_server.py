@@ -57,8 +57,7 @@ class ChatCompletionRequest(BaseModel):
     max_iterations: Optional[int] = 10
     enable_logging: Optional[bool] = True  # Default to True so you can see what's happening
     
-    class Config:
-        extra = "allow"  # Allow extra fields from OpenAI client
+    model_config = {"extra": "allow"}  # Allow extra fields from OpenAI client
 
 class Usage(BaseModel):
     prompt_tokens: int = 0
@@ -104,14 +103,14 @@ app = FastAPI(
 # Helper Functions
 # ============================================================================
 
-def extract_context_and_query(messages: List[Message]) -> tuple[Any, str]:
+def extract_context_and_query(messages: List[Message]) -> tuple[str, str]:
     """
     Extract context and query from the message list.
     
     Strategy:
-    1. If there's a system message, use it as context
-    2. If messages are very long, bundle earlier messages as context
-    3. Use the last user message as the query
+    - System message content becomes the context (as a string)
+    - Last user message becomes the query
+    - If no system message, concatenate all non-user messages as context
     """
     if not messages:
         raise ValueError("No messages provided")
@@ -126,9 +125,18 @@ def extract_context_and_query(messages: List[Message]) -> tuple[Any, str]:
     if not query:
         raise ValueError("No user message found")
     
-    # Build context from all messages
-    # RLM can handle this as a list of dicts
-    context = [{"role": msg.role, "content": msg.content} for msg in messages]
+    # Get context from system message or concatenate other messages
+    context_parts = []
+    for msg in messages:
+        if msg.role == "system":
+            # System message is the main context
+            context_parts.append(msg.content)
+        elif msg.role != "user":
+            # Include assistant messages too
+            context_parts.append(msg.content)
+    
+    # Join all context parts, or use empty string if none
+    context = "\n\n".join(context_parts) if context_parts else ""
     
     return context, query
 
@@ -282,7 +290,7 @@ def main():
     """)
     
     uvicorn.run(
-        "openai_rlm_server:app",
+        "rlm_server:app",
         host=args.host,
         port=args.port,
         reload=args.reload

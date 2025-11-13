@@ -2,6 +2,62 @@
 
 [Link to the original blogpost 📝](https://alexzhang13.github.io/blog/2025/rlm/)
 
+## 🚀 OpenAI-Compatible Server
+
+Run RLM as an OpenAI-compatible API server to handle arbitrarily large contexts.
+
+### Quick Start
+
+```bash
+# 1. Set your OpenAI API key
+export OPENAI_API_KEY="sk-..."
+
+# 2. Start the server
+python rlm_server.py
+```
+
+Server runs at `http://localhost:8000` with verbose logging enabled.
+
+### Usage
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="dummy")
+
+# Load any size file
+with open("huge_file.txt") as f:
+    content = f.read()
+
+response = client.chat.completions.create(
+    model="rlm-gpt-4o-mini",
+    messages=[
+        {"role": "system", "content": content},
+        {"role": "user", "content": "Summarize this"}
+    ]
+)
+
+print(response.choices[0].message.content)
+```
+
+### Examples
+
+```bash
+cd examples
+
+# Simple example with small document
+python simple_example.py
+
+# Large file example (3.3MB Codebase.txt)
+python large_file_example.py
+```
+
+Watch the server terminal to see RLM's recursive iterations in real-time!
+
+---
+
+## Original README
+
 I received a lot of requests to put out a notebook or gist version of the codebase I've been using. Sadly it's a bit entangled with a bunch of random state, cost, and code execution tracking logic that I want to clean up while I run other experiments. In the meantime, I've re-written a simpler version of what I'm using so people can get started building on top and writing their own RLM implementations. Happy hacking!
 
 ![teaser](media/rlm.png)
