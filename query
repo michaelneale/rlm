@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""
+Simple CLI to query files or text using RLM.
+
+Usage:
+    ./query <file_path> "your question"
+    ./query --text "some text" "your question"
+"""
+
+import sys
+import os
+from pathlib import Path
+from rlm_query import query_text, query_file
+
+
+def main():
+    if len(sys.argv) < 3:
+        print("Usage:")
+        print("  ./query <file_path> \"your question\"")
+        print("  ./query --text \"some text\" \"your question\"")
+        sys.exit(1)
+    
+    # Parse arguments
+    if sys.argv[1] == "--text":
+        if len(sys.argv) < 4:
+            print("Error: --text requires both text and query")
+            sys.exit(1)
+        text = sys.argv[2]
+        question = sys.argv[3]
+        print(f"📝 Querying text ({len(text)} chars)...")
+        print(f"❓ Query: {question}\n")
+        print("⏳ Processing with RLM...\n")
+        
+        # Use shared query logic
+        try:
+            result = query_text(text, question, max_iterations=10, enable_logging=True)
+        except Exception as e:
+            print(f"\n❌ Error: {e}")
+            sys.exit(1)
+    else:
+        file_path = sys.argv[1]
+        question = sys.argv[2]
+        
+        # Show file info
+        try:
+            path = Path(file_path)
+            size_mb = path.stat().st_size / (1024 * 1024)
+            print(f"📄 Querying {path.name} ({size_mb:.2f}MB)")
+        except:
+            pass
+        
+        print(f"❓ Query: {question}\n")
+        print("⏳ Processing with RLM...\n")
+        
+        # Use shared query logic
+        try:
+            result = query_file(file_path, question, max_iterations=10, enable_logging=True)
+        except FileNotFoundError as e:
+            print(f"\n❌ {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"\n❌ Error: {e}")
+            sys.exit(1)
+    
+    # Print result
+    print("\n" + "=" * 70)
+    print("💡 ANSWER:")
+    print("=" * 70)
+    print(result)
+    print("=" * 70)
+
+
+if __name__ == "__main__":
+    main()

@@ -2,57 +2,123 @@
 
 [Link to the original blogpost 📝](https://alexzhang13.github.io/blog/2025/rlm/)
 
-## 🚀 OpenAI-Compatible Server
+## 🚀 Quick Start
 
-Run RLM as an OpenAI-compatible API server to handle arbitrarily large contexts.
-
-### Quick Start
+### CLI Usage
 
 ```bash
-# 1. Set your OpenAI API key
+# Set your API key
 export OPENAI_API_KEY="sk-..."
 
-# 2. Start the server
-python rlm_server.py
+# Query a file
+./query Codebase.txt "What is this codebase about?"
+
+# Query text directly
+./query --text "Some long text here" "Summarize this"
 ```
 
-Server runs at `http://localhost:8000` with verbose logging enabled.
+### MCP Server
 
-### Usage
-
-```python
-from openai import OpenAI
-
-client = OpenAI(base_url="http://localhost:8000/v1", api_key="dummy")
-
-# Load any size file
-with open("huge_file.txt") as f:
-    content = f.read()
-
-response = client.chat.completions.create(
-    model="rlm-gpt-4o-mini",
-    messages=[
-        {"role": "system", "content": content},
-        {"role": "user", "content": "Summarize this"}
-    ]
-)
-
-print(response.choices[0].message.content)
-```
-
-### Examples
+Run RLM as an MCP (Model Context Protocol) server - use it as a tool from Claude Desktop, Cline, or any MCP client.
 
 ```bash
-cd examples
+# 1. Install dependencies
+pip install -r requirements.txt
 
-# Simple example with small document
-python simple_example.py
-
-# Large file example (3.3MB Codebase.txt)
-python large_file_example.py
+# 2. Add to your MCP client config
+# See MCP Configuration below
 ```
 
-Watch the server terminal to see RLM's recursive iterations in real-time!
+### MCP Configuration
+
+**Option 1: Local install**
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "rlm": {
+      "command": "python",
+      "args": ["/absolute/path/to/rlm/mcp_server.py"],
+      "env": {
+        "OPENAI_API_KEY": "sk-..."
+      }
+    }
+  }
+}
+```
+
+**Option 2: Using uvx (recommended for published packages)**
+
+If published to PyPI:
+```json
+{
+  "mcpServers": {
+    "rlm": {
+      "command": "uvx",
+      "args": ["mcp-server-rlm"],
+      "env": {
+        "OPENAI_API_KEY": "sk-..."
+      }
+    }
+  }
+}
+```
+
+Or from git:
+```json
+{
+  "mcpServers": {
+    "rlm": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/yourusername/rlm.git", "mcp-server-rlm"],
+      "env": {
+        "OPENAI_API_KEY": "sk-..."
+      }
+    }
+  }
+}
+```
+
+**Option 3: Using uv run (for local development)**
+
+```json
+{
+  "mcpServers": {
+    "rlm": {
+      "command": "uv",
+      "args": ["--directory", "/absolute/path/to/rlm", "run", "mcp-server-rlm"],
+      "env": {
+        "OPENAI_API_KEY": "sk-..."
+      }
+    }
+  }
+}
+```
+
+### Available Tools
+
+**`query_text`** - Query large text using RLM
+- `text`: The text/document to query (any size)
+- `query`: Your question
+- `max_iterations`: Optional, default 10
+
+**`query_file`** - Query a file using RLM  
+- `file_path`: Path to the file
+- `query`: Your question
+- `max_iterations`: Optional, default 10
+
+### Example Usage
+
+From Claude Desktop or any MCP client:
+
+```
+"Can you use the query_file tool to analyze Codebase.txt 
+and tell me what the main components are?"
+```
+
+RLM will recursively process the file and return an answer, even if it's 3MB+!
 
 ---
 

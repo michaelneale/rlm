@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-server-rlm"
+version = "1.0.0"
+description = "MCP server for Recursive Language Model - query large texts/files"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "RLM Contributors"}
+]
+dependencies = [
+    "mcp>=1.0.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+mcp-server-rlm = "mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/rlm"
+Repository = "https://github.com/yourusername/rlm"
+
+[tool.setuptools]
+packages = ["rlm", "rlm.utils", "rlm.logger"]
+py-modules = ["mcp_server", "rlm_query"]
